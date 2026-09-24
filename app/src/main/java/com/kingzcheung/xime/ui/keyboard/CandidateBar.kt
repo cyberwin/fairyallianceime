@@ -122,7 +122,9 @@ fun CandidateBar(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val horizontalPadding = if (isLandscape) 50.dp else 8.dp
+    // 统一 8dp 靠边；横屏挖孔/导航栏的物理避让由服务层内容容器的边衬区 padding 统一处理，
+    // 不再叠加手机横屏专用的 50dp 缩进
+    val horizontalPadding = 8.dp
     val context = LocalContext.current
 
     // M3 角色色：图标按钮背景用 surface 与 primary 的混合色调（带种子色但不过于强烈），

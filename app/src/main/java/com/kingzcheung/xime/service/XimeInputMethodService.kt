@@ -246,6 +246,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
 
     private val bottomInsetPxState = mutableStateOf(0)
+    /** 左右 inset（px）：手机上键盘内容避让挖孔/横屏导航栏，平板不做避让（候选栏按钮靠边）。 */
+    private val horizontalInsetPxState = mutableStateOf(0 to 0)
     private var hasHardwareKeyboard = false
     /** 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）。
      *  主线程写（onStartInput）、key-processing 线程读（英文联想短路），volatile 保证可见性。 */
@@ -1261,11 +1263,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyboardContainer.clipChildren = false
 
         bottomInsetPxState.value = getActiveBottomInsetPx(window.window)
+        horizontalInsetPxState.value = getActiveHorizontalInsetsPx(window.window)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             keyboardContainer.setOnApplyWindowInsetsListener { v, insets ->
                 val px = extractBottomInset(insets)
                 if (px != bottomInsetPxState.value) {
                     bottomInsetPxState.value = px
+                }
+                val h = extractHorizontalInsets(insets)
+                if (h != horizontalInsetPxState.value) {
+                    horizontalInsetPxState.value = h
                 }
                 v.onApplyWindowInsets(insets)
             }
@@ -1341,6 +1348,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val activeBottomDp = if (bottomSpaceDp == 0) minBottomDp else bottomSpaceDp
                 val navBarDp = activeBottomDp.dp
                 val hasNavBar = navBarDp > 0.dp
+                // 左右边衬区：手机上键盘内容（候选栏 logo/收起按钮与按键区）避让挖孔/横屏导航栏；
+                // 平板不避让（候选栏 logo/收起按钮靠边，见 CandidateBar）；浮动键盘可拖动，同样不避让。
+                val isTabletDevice = com.kingzcheung.xime.ui.isTablet()
+                val horizontalInsetDp = with(density) {
+                    horizontalInsetPxState.value.first.toDp() to horizontalInsetPxState.value.second.toDp()
+                }
 
                 // 快捷发送 / 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
                 // 不遮键盘按键），同时容器物理高度同步变大（updateHeight）→ IME insets 由系统确定性重算，
@@ -1427,6 +1440,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + overlayPanelExtra).dp)
                                 .align(androidx.compose.ui.Alignment.BottomCenter)
                                 .then(if (state.isFloatingMode) Modifier else Modifier.offset(y = (-activeBottomDp).dp))
+                                .then(
+                                    // 手机：键盘内容整体避入左右边衬区（背景仍全宽 edge-to-edge，与底部处理一致）
+                                    if (!state.isFloatingMode && !isTabletDevice) {
+                                        Modifier.padding(start = horizontalInsetDp.first, end = horizontalInsetDp.second)
+                                    } else Modifier
+                                )
                         ) {
                         CompositionLocalProvider(LocalStretchFactor provides state.stretchFactor) {
                             // 注意：kbState 只承载键盘按键/布局状态，不承载候选数据。

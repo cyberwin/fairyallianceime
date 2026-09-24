@@ -159,3 +159,69 @@ data class MarketPluginItem(
         get() = installed && installedVersion != null && plugin.currentVersion.isNotBlank() &&
             installedVersion != plugin.currentVersion
 }
+
+/* ─────────────────────────── 布局市场 ─────────────────────────── */
+
+/**
+ * 扁平布局索引格式：layouts 直接内联 MarketLayout 对象列表（对应 layouts/index.yaml）。
+ * 中心索引只做引用，包/资源/截图托管在作者自有仓库。
+ */
+@Serializable
+data class LayoutsDirectIndex(
+    @SerialName("index_version") val indexVersion: Int = 1,
+    @SerialName("updated_at") val updatedAt: String = "",
+    val layouts: List<MarketLayout> = emptyList(),
+)
+
+@Serializable
+data class MarketLayout(
+    val id: String = "",
+    val name: String = "",
+    val author: String = "",
+    val description: String = "",
+    val tags: List<String> = emptyList(),
+    val repo: String = "",
+    val homepage: String = "",
+    val license: String = "",
+    val warning: String = "",
+    @SerialName("appVersion") val appVersion: String = "",
+    /** 依赖的输入方案 id：非空且未安装时不可应用。 */
+    @SerialName("requiresSchemes") val requiresSchemes: List<String> = emptyList(),
+    /** 详情页截图 URL（1~5 张）。 */
+    val screenshots: List<String> = emptyList(),
+    @SerialName("currentVersion") val currentVersion: String = "",
+    val versions: List<LayoutVersion> = emptyList(),
+) {
+    /** 当前应安装的版本：优先匹配 currentVersion，否则取第一条，都没有则 null。 */
+    fun resolvedVersion(): LayoutVersion? =
+        versions.firstOrNull { it.version == currentVersion } ?: versions.firstOrNull()
+}
+
+@Serializable
+data class LayoutVersion(
+    val version: String = "",
+    val date: String = "",
+    val changelog: String = "",
+    @SerialName("downloadUrl")
+    val downloadUrls: List<DownloadItem> = emptyList(),
+    val size: String = "",
+    val sha256: String = "",
+)
+
+/** 布局列表项 = 布局 + 运行期派生状态。 */
+data class MarketLayoutItem(
+    val layout: MarketLayout,
+    val compatible: Boolean,
+    val minAppVersion: String,
+    /** 本地已应用布局的版本（无则未应用） */
+    val installedVersion: String? = null,
+    /** 依赖方案是否已安装（requiresSchemes 为空视为满足） */
+    val schemeReady: Boolean = true,
+) {
+    val applied: Boolean get() = installedVersion != null
+
+    /** 是否已有更新：已应用且本地版本 != 索引当前版本。 */
+    val hasUpdate: Boolean
+        get() = applied && layout.currentVersion.isNotBlank() &&
+            installedVersion != layout.currentVersion
+}

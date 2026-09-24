@@ -10,6 +10,7 @@ object SettingsRoutes {
     const val SchemaMarketDetail = "schema_market_detail/{schemeId}"
     const val ModelMarketDetail = "model_market_detail/{modelId}"
     const val PluginMarketDetail = "plugin_market_detail/{pluginId}"
+    const val LayoutMarketDetail = "layout_market_detail/{layoutId}"
     const val Theme = "theme"
     const val KeyEffect = "key_effect"
     const val LayoutDisplay = "layout_display"

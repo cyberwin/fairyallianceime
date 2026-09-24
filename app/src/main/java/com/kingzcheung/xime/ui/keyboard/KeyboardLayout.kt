@@ -47,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.isTablet
 import com.kingzcheung.xime.settings.DisplayMode
 import com.kingzcheung.xime.settings.ButtonLayout
 import com.kingzcheung.xime.settings.KeyAction
@@ -272,12 +273,18 @@ fun KeyboardLayout(
 
     val isLandscape = !uiState.isFloatingMode && LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val useLandscapeSplitKeyboard = isLandscape && landscapeSplitKeyboardEnabled
+    // 手机横屏键盘矮，行距与分体紧凑档同源收紧；竖屏/平板保持常规行距
+    val landscapeCompactSpacing = isLandscape && !isTablet()
 
     CompositionLocalProvider(
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
+        LocalSwipeHintCorner provides landscapeCompactSpacing,
         LocalKeyVisualPadding provides PaddingValues(
             horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 4.25.dp,
+            // 手机横屏：只认 qwerty 专属覆盖（keyboard.key.qwerty.spacing_y），回退 2.5dp；
+            // 其余场景：全局 qwerty 行距，回退 4.25dp
+            vertical = if (landscapeCompactSpacing) (kbKey.spacingOverrides["qwerty"]?.spacingY?.dp ?: 2.5.dp)
+            else (kbKey.spacingFor("qwerty").second?.dp ?: 4.25.dp),
         ),
     ) {
     Box(
@@ -385,9 +392,14 @@ fun KeyboardLayout(
                     } else {
                         val rows = remember(keyRows) { normalizeQwertyRows(keyRows) }
                         rows.forEachIndexed { idx, ids ->
-                            // 9 键纯字母行（如 asdf 行）两端缩进，视觉居中
+                            // 9 键纯字母行（如 asdf 行）两端缩进，视觉居中。
+                            // 按首行键数取比例（9/10），任意行宽下第二行键宽都与首行一致——
+                            // 固定 16dp 在竖屏刚好、横屏宽行下不够，导致第二行键比首行宽
                             val indent = if (ids.size == 9 && ids.none { it in KeysConfigHelper.FUNCTION_KEY_IDS }) {
-                                Modifier.padding(horizontal = 16.dp)
+                                val firstRowSize = rows.firstOrNull()?.size ?: 10
+                                Modifier
+                                    .fillMaxWidth((9f / firstRowSize).coerceIn(0f, 1f))
+                                    .align(Alignment.CenterHorizontally)
                             } else Modifier
                             QwertyRow(
                                 ids = ids,
@@ -474,7 +486,7 @@ private class QwertyRowEnv(
     val swipeUpHintsEnabled: Boolean,
     val swipeDownHintsEnabled: Boolean,
     val configVersion: Int,
-    /** 横屏紧凑模式：字母段用 [CompactKeyboardRowWithConfig] 并套用 [fontSize]/[swipeFontSize]。 */
+    /** 横屏紧凑模式（手机）：字母段用 [CompactKeyboardRowWithConfig] 并套用 [fontSize]/[swipeFontSize]；平板为 false，走完整模式组件。 */
     val landscape: Boolean = false,
     val fontSize: TextUnit = TextUnit.Unspecified,
     val swipeFontSize: TextUnit = 9.sp,
@@ -602,7 +614,7 @@ private fun QwertyRow(
                         configVersion = env.configVersion,
                     )
                 } else {
-KeyboardRowWithConfig(
+                    KeyboardRowWithConfig(
                         keys = segment,
                         onKeyPress = env.onKeyPress,
                         config = rowConfig,
@@ -1435,6 +1447,8 @@ internal fun splitRowForLandscape(row: List<String>): Pair<List<String>, List<St
 /**
  * 横屏分体键盘内容 — 横屏且用户开启分体布局时渲染。
  * 将键盘拆分为左右两个面板，紧贴屏幕左右边缘，中间留空方便双手持机拇指操作。
+ * 样式按设备分两档：手机沿用原紧凑样式（12sp 小字号 + 2dp 行距 + 阶梯缩进，适配横屏矮键盘），
+ * 平板与完整模式同视觉（复用 KeyboardRowWithConfig，仅保留分体容器结构）。
  */
 @Composable
 private fun LandscapeKeyboardContent(
@@ -1472,9 +1486,11 @@ private fun LandscapeKeyboardContent(
     }
 
     val suppressCursorMove = LocalSuppressCursorMove.current
+    // 手机保留原紧凑样式（横屏键盘矮，小字号 + 小行距不拥挤）；平板走完整模式视觉
+    val compactStyle = !isTablet()
     val staggerStep = 10.dp
-    val landscapeFontSize = 12.sp
-    val landscapeSwipeFontSize = 7.sp
+    val landscapeFontSize = if (compactStyle) 12.sp else TextUnit.Unspecified
+    val landscapeSwipeFontSize = if (compactStyle) 7.sp else 9.sp
 
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
@@ -1492,7 +1508,6 @@ private fun LandscapeKeyboardContent(
     val bubbleBgColor = if (uiState.isDarkTheme) themeScheme.specialKeyDark
         else themeScheme.specialKeyLight
     val kbShadow = KeysConfigHelper.getKeyboardShadow()
-    val kbKey = KeysConfigHelper.getKeyboardKeyConfig()
     val shadowEnabled = kbShadow.enabled
     val shadowElevation = kbShadow.elevation.dp
     val shadowShapeRadius = kbShadow.shapeRadius.dp
@@ -1553,63 +1568,59 @@ private fun LandscapeKeyboardContent(
         swipeUpHintsEnabled = swipeUpHintsEnabled,
         swipeDownHintsEnabled = swipeDownHintsEnabled,
         configVersion = configVersion,
-        landscape = true,
+        landscape = compactStyle,
         fontSize = landscapeFontSize,
         swipeFontSize = landscapeSwipeFontSize,
     )
 
-    CompositionLocalProvider(
-        LocalKeyVisualPadding provides PaddingValues(
-            horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            // 竖向只认 qwerty 专属覆盖（keyboard.key.qwerty.spacing_y），不回退全局 spacing_y
-            vertical = kbKey.spacingOverrides["qwerty"]?.spacingY?.dp ?: 2.dp,
-        )
+    // 行距由外层 provider 统一提供（手机横屏回退 2dp / 平板 4.25dp），此处不再覆盖。
+    // 侧边距统一 4dp + 面板内距 4dp = 8dp 靠边，与候选栏一致；
+    // 挖孔/导航栏避让由服务层边衬区 padding 统一处理，不再叠加手机专用的 50dp 拇指区缩进。
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 2.dp, horizontal = 4.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(vertical = 2.dp, horizontal = 50.dp)
+                .fillMaxHeight()
+                .weight(0.42f)
+                .padding(start = 4.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.42f)
-                    .padding(start = 4.dp),
-            ) {
-                landscapeRows.forEachIndexed { idx, row ->
-                    val (left, _) = splitRowForLandscape(row)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = if (idx < landscapeRows.lastIndex) staggerStep * idx else 0.dp)
-                    ) {
-                        QwertyRow(ids = left, env = env)
-                    }
+            landscapeRows.forEachIndexed { idx, row ->
+                val (left, _) = splitRowForLandscape(row)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = if (compactStyle && idx < landscapeRows.lastIndex) staggerStep * idx else 0.dp)
+                ) {
+                    QwertyRow(ids = left, env = env)
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.weight(0.16f))
+        Spacer(modifier = Modifier.weight(0.16f))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.42f)
-                    .padding(end = 4.dp),
-            ) {
-                landscapeRows.forEachIndexed { idx, row ->
-                    val (_, right) = splitRowForLandscape(row)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = if (idx < landscapeRows.lastIndex) staggerStep * idx else 0.dp)
-                    ) {
-                        QwertyRow(ids = right, env = env)
-                    }
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.42f)
+                .padding(end = 4.dp),
+        ) {
+            landscapeRows.forEachIndexed { idx, row ->
+                val (_, right) = splitRowForLandscape(row)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = if (compactStyle && idx < landscapeRows.lastIndex) staggerStep * idx else 0.dp)
+                ) {
+                    QwertyRow(ids = right, env = env)
                 }
             }
         }
     }
 }
+
 
 /**
  * 横屏紧凑版按键 — 主字符和上滑字符垂直堆叠居中
@@ -2153,7 +2164,6 @@ fun CompactKeyboardRowWithConfig(
         }
     }
 }
-
 /** QWERTY 空格键 */
 @Composable
 private fun SpaceKey(
