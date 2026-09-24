@@ -178,7 +178,7 @@ fun MarketHubContent(
                 Tab(
                     selected = tabIndex == 3,
                     onClick = { tabIndex = 3 },
-                    text = { Text("主题与布局") },
+                    text = { Text("布局") },
                 )
             }
             when (tabIndex) {

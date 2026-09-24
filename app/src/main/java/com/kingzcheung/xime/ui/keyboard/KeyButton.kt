@@ -63,6 +63,10 @@ val LocalKeyVisualPadding = staticCompositionLocalOf {
     PaddingValues(horizontal = 2.dp, vertical = 4.25.dp)
 }
 
+/** 上滑/下滑提示改画键面角标（上滑=右上角、下滑=底部）。
+ *  手机横屏键矮，提示按默认方式画在主字符上下方（offset ±hintOffset）会被键盘顶部裁掉。 */
+val LocalSwipeHintCorner = staticCompositionLocalOf { false }
+
 /** 按键圆角半径，由各布局在根层通过 CompositionLocalProvider 提供。
  *  独立于 shadow.shape_radius，为统一配置化而设。 */
 val LocalKeyCornerRadius = staticCompositionLocalOf { 8.dp }
@@ -837,6 +841,9 @@ fun SwipeableKeyButton(
 
             // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
             // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
+            // 键矮场景（LocalSwipeHintCorner，手机横屏）：提示画角标（上=右上角、下=底部），
+            // 与 SwipeableKeyButtonLandscape 同款，避免 offset 提示被键盘顶部裁掉。
+            val swipeHintCorner = LocalSwipeHintCorner.current
             if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
                 val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
                 val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
@@ -847,7 +854,13 @@ fun SwipeableKeyButton(
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    modifier = Modifier.offset(y = -hintOffset),
+                    // 角标模式压掉默认行框：标签字体 metrics 的 ascent 大，不压行高字形会
+                    // 沉在行框下半部，视觉上贴不到键顶（与下方 badge 的 1.sp 同款）
+                    lineHeight = if (swipeHintCorner) 1.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
+                    modifier = if (swipeHintCorner) Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 2.dp, end = 4.dp)
+                    else Modifier.offset(y = -hintOffset),
                     fontFamily = keyLabelFontFamily
                 )
             }
@@ -861,7 +874,11 @@ fun SwipeableKeyButton(
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    modifier = Modifier.offset(y = hintOffset),
+                    lineHeight = if (swipeHintCorner) 1.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
+                    modifier = if (swipeHintCorner) Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 4.dp, bottom = 2.dp)
+                    else Modifier.offset(y = hintOffset),
                     fontFamily = keyLabelFontFamily
                 )
             }
@@ -1336,6 +1353,8 @@ fun SwipeableIconKeyButton(
         )
         
         if (!swipeText.isNullOrEmpty()) {
+            // 键矮场景（LocalSwipeHintCorner，手机横屏）：提示画右上角，避免 offset 提示被键盘顶部裁掉
+            val hintCorner = LocalSwipeHintCorner.current
             Text(
                 text = swipeText,
                 color = iconColor.copy(alpha = 0.5f),
@@ -1343,7 +1362,11 @@ fun SwipeableIconKeyButton(
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = (-14).dp),
+                lineHeight = if (hintCorner) 1.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
+                modifier = if (hintCorner) Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 4.dp)
+                else Modifier.offset(y = (-14).dp),
                 fontFamily = keyLabelFontFamily
             )
         }
