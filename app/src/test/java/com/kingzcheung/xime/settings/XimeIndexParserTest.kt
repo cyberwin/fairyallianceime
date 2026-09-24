@@ -292,24 +292,113 @@ class XimeIndexParserTest {
         assertTrue(nightly.compatible)
     }
 
+    private val layoutsIndex = """
+        index_version: 1
+        updated_at: "2026-09-24"
+        layouts:
+          - id: "number_row"
+            name: "数字行"
+            author: "xime"
+            description: "顶部新增一行数字"
+            tags: ["布局"]
+            repo: "https://github.com/ximeiorg/xime-layout-number-row"
+            license: "MIT"
+            appVersion: ">=3.0.0"
+            requiresSchemes: []
+            screenshots:
+              - "https://example.com/01.png"
+              - "https://example.com/02.png"
+            currentVersion: "1.1.0"
+            versions:
+              - version: "1.1.0"
+                date: "2026-09-24"
+                changelog: "修复英文键盘长按符号"
+                downloadUrl:
+                  - url: "https://github.com/ximeiorg/xime-layout-number-row/releases/download/v1.1.0/number_row-1.1.0.zip"
+                    sha256: "AAAA"
+                    size: "12 KB"
+              - version: "1.0.0"
+                date: "2026-09-01"
+                changelog: "首个版本"
+                downloadUrl:
+                  - url: "https://github.com/ximeiorg/xime-layout-number-row/releases/download/v1.0.0/number_row-1.0.0.zip"
+                    sha256: "BBBB"
+                    size: "11 KB"
+          - id: "cangjie"
+            name: "仓颉字根"
+            requiresSchemes: ["cangjie"]
+            currentVersion: "1.0.0"
+            versions:
+              - version: "1.0.0"
+                downloadUrl:
+                  - url: "https://example.com/cangjie-1.0.0.zip"
+                    sha256: "CCCC"
+    """.trimIndent()
+
     @Test
-    fun `toPluginItem hasUpdate when installed version differs`() {
-        val idx = XimeIndexParser.parsePluginsDirectIndex(pluginsIndex)
-        val kaomoji = idx.plugins.first()
-
-        val outdated = XimeIndexParser.toPluginItem(
-            kaomoji, "2.6.0", installedVersions = mapOf(
-                "com.kingzcheung.xime.plugin.kaomoji" to "2.0.0",
-            ),
+    fun `parseLayoutsDirectIndex maps fields and tolerates unknown keys`() {
+        val idx = XimeIndexParser.parseLayoutsDirectIndex(layoutsIndex)
+        assertEquals(2, idx.layouts.size)
+        val numberRow = idx.layouts.first()
+        assertEquals("number_row", numberRow.id)
+        assertEquals(listOf("布局"), numberRow.tags)
+        assertEquals(">=3.0.0", numberRow.appVersion)
+        assertEquals("1.1.0", numberRow.currentVersion)
+        assertEquals(2, numberRow.screenshots.size)
+        assertEquals(2, numberRow.versions.size)
+        assertEquals(
+            "https://github.com/ximeiorg/xime-layout-number-row/releases/download/v1.1.0/number_row-1.1.0.zip",
+            numberRow.versions[0].downloadUrls[0].url,
         )
-        assertTrue(outdated.hasUpdate)
+        assertEquals("AAAA", numberRow.versions[0].downloadUrls[0].sha256)
+    }
 
-        val noCurrent = idx.plugins.firstOrNull { it.id == "com.kingzcheung.xime.plugin.funasr_asr" }!!
-        val noCurrentItem = XimeIndexParser.toPluginItem(
-            noCurrent.copy(currentVersion = ""), "2.6.0", installedVersions = mapOf(
-                "com.kingzcheung.xime.plugin.funasr_asr" to "1.0.0",
-            ),
+    @Test
+    fun `layout resolvedVersion picks currentVersion then falls back`() {
+        val idx = XimeIndexParser.parseLayoutsDirectIndex(layoutsIndex)
+        val numberRow = idx.layouts.first()
+        assertEquals("1.1.0", numberRow.resolvedVersion()?.version)
+
+        val noMatch = numberRow.copy(currentVersion = "9.9.9")
+        assertEquals("1.1.0", noMatch.resolvedVersion()?.version) // first
+
+        assertNull(numberRow.copy(versions = emptyList()).resolvedVersion())
+    }
+
+    @Test
+    fun `toLayoutItem computes compatibility installed state and scheme dependency`() {
+        val idx = XimeIndexParser.parseLayoutsDirectIndex(layoutsIndex)
+        val numberRow = idx.layouts.first()
+
+        val applied = XimeIndexParser.toLayoutItem(numberRow, "3.0.0", installedVersion = "1.0.0")
+        assertTrue(applied.compatible)
+        assertTrue(applied.applied)
+        assertTrue(applied.hasUpdate)              // 1.0.0 != 1.1.0
+        assertTrue(applied.schemeReady)            // 无依赖
+
+        val upToDate = XimeIndexParser.toLayoutItem(numberRow, "3.0.0", installedVersion = "1.1.0")
+        assertFalse(upToDate.hasUpdate)
+
+        val notApplied = XimeIndexParser.toLayoutItem(numberRow, "3.0.0")
+        assertFalse(notApplied.applied)
+        assertFalse(notApplied.hasUpdate)
+        assertEquals("3.0.0", notApplied.minAppVersion)
+
+        val incompatible = XimeIndexParser.toLayoutItem(numberRow, "2.9.0")
+        assertFalse(incompatible.compatible)
+    }
+
+    @Test
+    fun `toLayoutItem gates on required schemes`() {
+        val idx = XimeIndexParser.parseLayoutsDirectIndex(layoutsIndex)
+        val cangjie = idx.layouts.first { it.id == "cangjie" }
+
+        val missing = XimeIndexParser.toLayoutItem(cangjie, "3.0.0", installedSchemaIds = emptySet())
+        assertFalse(missing.schemeReady)
+
+        val present = XimeIndexParser.toLayoutItem(
+            cangjie, "3.0.0", installedSchemaIds = setOf("cangjie", "pinyin"),
         )
-        assertFalse(noCurrentItem.hasUpdate)
+        assertTrue(present.schemeReady)
     }
 }

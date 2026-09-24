@@ -710,4 +710,40 @@ object SettingsPreferences {
     fun setBackupPluginId(context: Context, pluginId: String) {
         getPrefs(context).edit().putString(KEY_BACKUP_PLUGIN_ID, pluginId).apply()
     }
+
+    // ── 键盘布局市场：当前已应用的布局 ──────────────────────────
+
+    private const val KEY_APPLIED_LAYOUT_ID = "applied_layout_id"
+    private const val KEY_APPLIED_LAYOUT_VERSION = "applied_layout_version"
+    private const val KEY_APPLIED_LAYOUT_FILES = "applied_layout_files"
+
+    /** 已应用布局的 id（空表示未应用任何市场布局）。 */
+    fun getAppliedLayoutId(context: Context): String =
+        getPrefs(context).getString(KEY_APPLIED_LAYOUT_ID, "") ?: ""
+
+    /** 已应用布局的版本（用于「有更新」提示）。 */
+    fun getAppliedLayoutVersion(context: Context): String =
+        getPrefs(context).getString(KEY_APPLIED_LAYOUT_VERSION, "") ?: ""
+
+    /** 已应用布局释放到 rime 的相对文件清单（恢复默认时回收）。 */
+    fun getAppliedLayoutFiles(context: Context): List<String> {
+        val raw = getPrefs(context).getString(KEY_APPLIED_LAYOUT_FILES, "") ?: ""
+        return raw.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun setAppliedLayout(context: Context, id: String, version: String, files: List<String>) {
+        getPrefs(context).edit()
+            .putString(KEY_APPLIED_LAYOUT_ID, id)
+            .putString(KEY_APPLIED_LAYOUT_VERSION, version)
+            .putString(KEY_APPLIED_LAYOUT_FILES, files.joinToString("\n"))
+            .apply()
+    }
+
+    fun clearAppliedLayout(context: Context) {
+        getPrefs(context).edit()
+            .remove(KEY_APPLIED_LAYOUT_ID)
+            .remove(KEY_APPLIED_LAYOUT_VERSION)
+            .remove(KEY_APPLIED_LAYOUT_FILES)
+            .apply()
+    }
 }

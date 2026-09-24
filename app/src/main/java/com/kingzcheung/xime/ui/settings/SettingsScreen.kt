@@ -76,6 +76,9 @@ fun SettingsScreen(
                 onNavigateToPluginDetail = { pluginId ->
                     navController.navigate("plugin_market_detail/$pluginId")
                 },
+                onNavigateToLayoutDetail = { layoutId ->
+                    navController.navigate("layout_market_detail/$layoutId")
+                },
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
             )
@@ -117,6 +120,16 @@ fun SettingsScreen(
             val pluginId = backStackEntry.arguments?.getString("pluginId") ?: return@composable
             PluginMarketDetailContent(
                 pluginId = pluginId,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = SettingsRoutes.LayoutMarketDetail,
+            arguments = listOf(navArgument("layoutId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val layoutId = backStackEntry.arguments?.getString("layoutId") ?: return@composable
+            LayoutMarketDetailContent(
+                layoutId = layoutId,
                 onBack = { navController.popBackStack() },
             )
         }
@@ -238,6 +251,9 @@ fun SettingsScreen(
                 },
                 onNavigateToPluginDetail = { pluginId ->
                     navController.navigate("plugin_market_detail/$pluginId")
+                },
+                onNavigateToLayoutDetail = { layoutId ->
+                    navController.navigate("layout_market_detail/$layoutId")
                 },
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },

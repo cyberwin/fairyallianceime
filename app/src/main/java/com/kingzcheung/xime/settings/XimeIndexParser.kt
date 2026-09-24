@@ -25,6 +25,10 @@ object XimeIndexParser {
     fun parsePluginsDirectIndex(text: String): PluginsDirectIndex =
         yaml.decodeFromString(PluginsDirectIndex.serializer(), text)
 
+    /** 解析布局扁平索引（layouts/index.yaml）。 */
+    fun parseLayoutsDirectIndex(text: String): LayoutsDirectIndex =
+        yaml.decodeFromString(LayoutsDirectIndex.serializer(), text)
+
     fun parseScheme(text: String): MarketScheme =
         yaml.decodeFromString(MarketScheme.serializer(), migrateDownloadUrl(text))
 
@@ -113,6 +117,22 @@ object XimeIndexParser {
             installedVersion = installedVersion,
         )
     }
+
+    /** 布局条目：兼容性判定同方案/插件；[installedSchemaIds] 用于依赖方案校验。 */
+    fun toLayoutItem(
+        layout: MarketLayout,
+        appVersion: String,
+        installedVersion: String? = null,
+        installedSchemaIds: Set<String> = emptySet(),
+    ): MarketLayoutItem =
+        MarketLayoutItem(
+            layout = layout,
+            compatible = isCompatible(appVersion, layout.appVersion),
+            minAppVersion = minAppVersionLabel(layout.appVersion),
+            installedVersion = installedVersion,
+            schemeReady = layout.requiresSchemes.isEmpty() ||
+                layout.requiresSchemes.all { it in installedSchemaIds },
+        )
 
     /** 取版本号的数值核心 major.minor.patch（忽略 -beta/+build 后缀，缺位补 0）；无法解析返回 null。 */
     private fun numericCore(v: String): List<Int>? {
