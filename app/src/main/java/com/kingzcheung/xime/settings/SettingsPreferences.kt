@@ -49,6 +49,10 @@ object SettingsPreferences {
     const val KEY_SHOW_PRESS_BUBBLE = "show_press_bubble"
     const val KEY_LANDSCAPE_SPLIT_KEYBOARD_ENABLED = "landscape_split_keyboard_enabled"
 
+    private const val KEY_RIME_INSTALLATION_ID = "rime_installation_id"
+
+    private const val KEY_LAST_RIME_SYNC_AT = "last_rime_sync_at"
+
     private const val KEY_MODE_CHANGE_TARGET = "mode_change_target"
 
     fun getModeChangeTargetIsNumber(context: Context): Boolean {
@@ -546,6 +550,27 @@ object SettingsPreferences {
 
     fun setLandscapeSplitKeyboardEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_LANDSCAPE_SPLIT_KEYBOARD_ENABLED, enabled).apply()
+    }
+
+    /**
+     * rime installation.yaml 的稳定安装 id（宿主接管生成）：
+     * 部署会删除 installation.yaml，词库同步前以本 id 重建，保证同步快照
+     * 目录（sync/<installation_id>/）不随部署轮换。
+     */
+    fun getRimeInstallationId(context: Context): String {
+        val prefs = getPrefs(context)
+        prefs.getString(KEY_RIME_INSTALLATION_ID, null)?.let { return it }
+        val id = java.util.UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_RIME_INSTALLATION_ID, id).apply()
+        return id
+    }
+
+    /** 上次词库同步完成时间（毫秒时间戳，0=从未同步）。 */
+    fun getLastRimeSyncAt(context: Context): Long =
+        getPrefs(context).getLong(KEY_LAST_RIME_SYNC_AT, 0L)
+
+    fun setLastRimeSyncAt(context: Context, at: Long) {
+        getPrefs(context).edit().putLong(KEY_LAST_RIME_SYNC_AT, at).apply()
     }
     
     /** 获取方案偏好的键盘布局，默认全键盘 */

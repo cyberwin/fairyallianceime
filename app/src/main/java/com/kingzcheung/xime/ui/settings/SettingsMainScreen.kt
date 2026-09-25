@@ -335,8 +335,8 @@ fun SettingsMainContent(
                 SettingsSection(                title = "同步与备份", content = {
                     SettingsItem(
                         icon = Icons.TwoTone.Backup,
-                        title = "云备份",
-                        subtitle = "通过备份插件将配置备份到云端并恢复",
+                        title = "同步与备份",
+                        subtitle = "多设备词典互通与配置备份",
                         onClick = onNavigateToBackup,
                         showArrow = true
                     )
