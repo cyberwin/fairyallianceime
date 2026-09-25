@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -286,20 +290,26 @@ private fun LayoutDetailBody(
 
         if (layout.screenshots.isNotEmpty()) {
             item {
+                // 截图缩略图横排：全宽渲染会把竖版键盘截图放大到整屏高，
+                // 详情页被撑爆；点击仍进全屏预览（双指缩放）
                 Text("截图", style = MaterialTheme.typography.titleSmall)
-            }
-            layout.screenshots.forEach { url ->
-                item {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context).data(url).crossfade(true).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { previewUrl = url },
-                    )
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(layout.screenshots) { url ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(url).crossfade(true).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .width(120.dp)
+                                .aspectRatio(9f / 19f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { previewUrl = url },
+                        )
+                    }
                 }
             }
         }

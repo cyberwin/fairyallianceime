@@ -557,6 +557,19 @@ class RimeEngine {
         }
     }
 
+    /**
+     * 用户词典同步（librime 原生 sync）：合并 sync 目录下其他设备的快照进 userdb，
+     * 并导出本机快照（TSV 文本，时间戳合并）。持 rimeLock 独占至维护结束，
+     * 期间输入查询走 tryLocked 立即降级，不会阻塞 UI。
+     * 调用前需保证 installation.yaml 存在且 id 稳定（见 SyncManager.ensureInstallationYaml）。
+     */
+    fun syncUserData(): Boolean {
+        if (!isInitialized) return false
+        locked {
+            return nativeSyncUserData()
+        }
+    }
+
     fun lookupText(text: String): String {
         if (!isInitialized || text.isEmpty()) return ""
         return tryLocked("") {
@@ -740,6 +753,7 @@ class RimeEngine {
         }
     }
     private external fun nativeStartMaintenance(full: Boolean): Boolean
+    private external fun nativeSyncUserData(): Boolean
     private external fun nativeDeploy(): Boolean
     private external fun nativeDeploySchema(schemaId: String): Boolean
     private external fun nativeLookupText(text: String): String

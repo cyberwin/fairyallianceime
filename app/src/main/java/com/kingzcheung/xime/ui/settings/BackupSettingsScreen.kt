@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +45,7 @@ import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.settings.BackupManager
 import com.kingzcheung.xime.settings.ExportMode
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.SyncManager
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,10 +55,13 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 云备份（插件）设置页。
+ * 同步与备份设置页。
  *
- * 备份目标为已安装的 backup 类型插件（单选激活，与剪贴板同步同模式）；
- * 备份包由宿主 BackupManager 生成/恢复，服务器配置由所选插件的配置表单承载。
+ * 词库同步为主链路：基于引擎原生用户词典同步（sync 快照，时间戳合并），
+ * 支持本地导入/导出与经备份插件的多端云端互通；配置备份为附带功能
+ * （方案/设置/插件包，不含用户词典——词典统一走快照合并语义）。
+ * 备份目标为已安装的 backup 类型插件（单选激活，与剪贴板同步同模式），
+ * 包由宿主生成/恢复，服务器配置由所选插件的配置表单承载。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,11 +94,44 @@ fun BackupSettingsContent(
     var message by remember { mutableStateOf<String?>(null) }
     var remoteList by remember { mutableStateOf<List<com.kingzcheung.xime.plugin.core.api.RemoteBackupEntry>?>(null) }
 
+    // 词库同步（词典快照为主链路，配置备份为附带；语义分工见各区块说明）
+    var lastSyncAt by remember {
+        mutableStateOf(SettingsPreferences.getLastRimeSyncAt(context))
+    }
+    var syncRemoteList by remember {
+        mutableStateOf<List<com.kingzcheung.xime.plugin.core.api.RemoteBackupEntry>?>(null)
+    }
+    LaunchedEffect(activePlugin) {
+        val plugin = activePlugin?.second ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            syncRemoteList = SyncManager.listRemoteSnapshots(plugin)
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        busyOp = "import"
+        message = null
+        scope.launch(Dispatchers.IO) {
+            val result = SyncManager.importSnapshots(context, uris.toList())
+            withContext(Dispatchers.Main) {
+                busyOp = null
+                lastSyncAt = SettingsPreferences.getLastRimeSyncAt(context)
+                message = result.fold(
+                    onSuccess = { "已导入 $it 个快照并完成合并" },
+                    onFailure = { "导入失败：${it.message}" }
+                )
+            }
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("云备份") },
+                title = { Text("同步与备份") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -179,8 +219,208 @@ fun BackupSettingsContent(
                 }
             )
 
+            SettingsSection(
+                title = "词库同步",
+                content = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = buildString {
+                                append("设备标识：")
+                                append(SettingsPreferences.getRimeInstallationId(context).take(8))
+                                append("　上次同步：")
+                                append(
+                                    if (lastSyncAt > 0) {
+                                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                                            .format(Date(lastSyncAt))
+                                    } else "从未"
+                                )
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                busyOp = "sync"
+                                message = null
+                                scope.launch(Dispatchers.IO) {
+                                    val result = SyncManager.syncNow(context)
+                                    withContext(Dispatchers.Main) {
+                                        busyOp = null
+                                        lastSyncAt = SettingsPreferences.getLastRimeSyncAt(context)
+                                        message = result.fold(
+                                            onSuccess = { "同步完成" },
+                                            onFailure = { "同步失败：${it.message}" }
+                                        )
+                                    }
+                                }
+                            },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (busyOp == "sync") {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("立即同步")
+                            }
+                        }
+                        Text(
+                            text = "合并本机 sync 目录中已有的快照（含此前导入的），并导出本机最新快照。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    busyOp = "import"
+                                    importLauncher.launch(arrayOf("*/*"))
+                                },
+                                enabled = !busy
+                            ) {
+                                if (busyOp == "import") {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("导入快照")
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    busyOp = "export"
+                                    message = null
+                                    scope.launch(Dispatchers.IO) {
+                                        val result = SyncManager.exportToDownloads(context)
+                                        withContext(Dispatchers.Main) {
+                                            busyOp = null
+                                            message = result.fold(
+                                                onSuccess = { "已保存到下载目录：$it" },
+                                                onFailure = { "导出失败：${it.message}" }
+                                            )
+                                        }
+                                    }
+                                },
+                                enabled = !busy
+                            ) {
+                                if (busyOp == "export") {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("导出到下载")
+                                }
+                            }
+                        }
+                        Text(
+                            text = "词典快照基于引擎原生同步：多设备词条按时间戳合并不互相覆盖。导入支持快照包 zip 与 .userdb.txt 文本快照（从其他设备/桌面端的 sync 目录拷出即可迁移）；导出的 zip 也可放进电脑端引擎目录的 sync 文件夹直接合并。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            )
+
             activePlugin?.let { selected ->
                 val plugin = selected.second
+
+                SettingsSection(
+                    title = "云端快照",
+                    content = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    busyOp = "remote"
+                                    message = null
+                                    scope.launch(Dispatchers.IO) {
+                                        val result = SyncManager.remoteSync(context, plugin)
+                                        withContext(Dispatchers.Main) {
+                                            busyOp = null
+                                            lastSyncAt = SettingsPreferences.getLastRimeSyncAt(context)
+                                            message = result.fold(
+                                                onSuccess = { pulled ->
+                                                    scope.launch(Dispatchers.IO) {
+                                                        val fresh = SyncManager.listRemoteSnapshots(plugin)
+                                                        withContext(Dispatchers.Main) {
+                                                            syncRemoteList = fresh
+                                                        }
+                                                    }
+                                                    if (pulled > 0) "已合并 $pulled 台设备的快照并上传本机快照"
+                                                    else "已上传本机快照（远端暂无其他设备）"
+                                                },
+                                                onFailure = { "云端同步失败：${it.message}" }
+                                            )
+                                        }
+                                    }
+                                },
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (busyOp == "remote") {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("同步到云端")
+                                }
+                            }
+                            val syncList = syncRemoteList
+                            if (syncList == null) {
+                                Text(
+                                    text = "正在获取远端快照列表…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (syncList.isEmpty()) {
+                                Text(
+                                    text = "云端暂无快照。执行\"同步到云端\"后，其他设备将能看到本机快照并自动合并新词条。",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                syncList.forEach { entry ->
+                                    Column {
+                                        Text(
+                                            text = entry.name,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = buildString {
+                                                if (entry.createdAt > 0) {
+                                                    append(
+                                                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                                                            .format(Date(entry.createdAt))
+                                                    )
+                                                }
+                                                if (entry.size >= 0) {
+                                                    if (isNotEmpty()) append(" · ")
+                                                    append(String.format(Locale.getDefault(), "%.1f KB", entry.size / 1024.0))
+                                                }
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+
                 SettingsSection(
                     title = "备份设置",
                     content = {
@@ -207,7 +447,7 @@ fun BackupSettingsContent(
                             }
                             if (backupMode == ExportMode.CONFIG_ONLY) {
                                 Text(
-                                    text = "仅配置：不含用户词典（.db）与模型（.bin/.gram）",
+                                    text = "仅配置：额外排除模型（.bin/.gram）；完整备份另含插件包。两种模式均不含用户词典——词典请使用上方\"词库同步\"快照，恢复配置包不会回滚词条。",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -264,7 +504,10 @@ fun BackupSettingsContent(
                                         busyOp = "list"
                                         message = null
                                         scope.launch(Dispatchers.IO) {
+                                            // 词库同步快照（rime-sync- 前缀）属于词库同步页，
+                                            // 不参与全量恢复语义，此处过滤不展示
                                             val list = BackupManager.listRemote(plugin)
+                                                ?.filter { !SyncManager.isRemoteSyncEntry(it.name) }
                                             val err = if (list == null) "获取备份列表失败" else null
                                             withContext(Dispatchers.Main) {
                                                 busyOp = null
@@ -344,7 +587,8 @@ fun BackupSettingsContent(
                                                         val result = BackupManager.restore(context, plugin, entry.id)
                                                         withContext(Dispatchers.Main) {
                                                             busyOp = null
-                                                            message = if (result.isSuccess) "恢复完成，重启应用后生效"
+                                                            message = if (result.isSuccess)
+                                                                "恢复完成，重启应用后生效；如需找回备份后新增的词条，请在\"词库同步\"中重新执行同步"
                                                             else "恢复失败：${result.exceptionOrNull()?.message}"
                                                         }
                                                     }
@@ -366,7 +610,8 @@ fun BackupSettingsContent(
                                                     message = null
                                                     scope.launch(Dispatchers.IO) {
                                                         val ok = BackupManager.deleteRemote(plugin, entry.id)
-                                                        val fresh = if (ok) BackupManager.listRemote(plugin) else null
+                                                        val fresh = if (ok) BackupManager.listRemote(plugin)
+                                                            ?.filter { !SyncManager.isRemoteSyncEntry(it.name) } else null
                                                         withContext(Dispatchers.Main) {
                                                             busyOp = null
                                                             if (ok) {

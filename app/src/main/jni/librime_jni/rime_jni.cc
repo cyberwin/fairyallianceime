@@ -719,7 +719,65 @@ public:
         LOGI("Deployment completed successfully");
         return true;
     }
-    
+
+    /**
+     * 用户词典同步（librime 原生 sync）：合并 sync 目录下其他设备的快照进 userdb，
+     * 并导出本机快照（TSV 文本，经时间戳合并，无 leveldb 文件级覆盖的一致性风险）。
+     * 与 deploy() 同构：销毁会话 → 触发同步任务 → 轮询维护结束 → 重建会话。
+     */
+    bool syncUserData() {
+        if (!rime) {
+            LOGE("syncUserData: rime not available");
+            return false;
+        }
+
+        // sync 输出/合并目录固定在用户数据目录下。librime 默认 sync_dir 为
+        // 相对路径 "sync"，在 Android 会落到进程 CWD（无权限）导致静默失败。
+        // rime::path 的字符串构造在非 Windows 下为 explicit，需显式构造后赋值
+        rime::Service::instance().deployer().sync_dir =
+            rime::path(user_data_dir_ + "/sync");
+        LOGI("Syncing user data, sync_dir=%s/sync", user_data_dir_.c_str());
+
+        // 与 deploy() 一致先销毁旧会话；同步任务内部亦会清理全部会话
+        if (session_id_) {
+            rime->destroy_session(session_id_);
+            session_id_ = 0;
+        }
+
+        // levers 模块注册的部署任务（installation_update/backup_config_files/
+        // user_dict_sync）需先加载模块组：start_maintenance 路径内部会
+        // LoadModules(kDeployerModules)，而 sync_user_data 不会——冷启动后
+        // 直接同步会报 unknown deployment task 并失败（与 deploySchema 同款先例）
+        rime::LoadModules(rime::kDeployerModules);
+
+        Bool result = rime->sync_user_data();
+        if (!result) {
+            LOGE("syncUserData: sync_user_data() returned false");
+            return false;
+        }
+
+        // user_dict_sync 是部署任务，等待维护结束（与 deploy() 同款轮询）
+        int wait_count = 0;
+        while (rime->is_maintenance_mode()) {
+            usleep(100000);  // 100ms
+            wait_count++;
+            if (wait_count % 10 == 0) {
+                LOGI("Waiting for user dict sync... (%d seconds)", wait_count / 10);
+            }
+        }
+
+        // 重建会话
+        session_id_ = rime->create_session();
+        if (!session_id_) {
+            LOGE("Failed to create session after sync");
+            return false;
+        }
+        reapplyPageSizeIfNeeded();
+
+        LOGI("User dict sync completed successfully");
+        return true;
+    }
+
     bool deploySchema(const char* schemaId) {
         if (!rime) {
             LOGE("deploySchema: rime not available");
@@ -1981,6 +2039,15 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeStartMaintenance(
 ) {
     Bool result = Rime::Instance().startMaintenance(full == JNI_TRUE);
     return result ? JNI_TRUE : JNI_FALSE;
+}
+
+// 用户词典同步：合并 sync 目录下已有快照 + 导出本机快照，阻塞至维护结束
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSyncUserData(
+    JNIEnv* env,
+    jobject thiz
+) {
+    return Rime::Instance().syncUserData() ? JNI_TRUE : JNI_FALSE;
 }
 
 // 更新 last_build_time 为当前时间，避免下次增量检测误判
