@@ -1,4 +1,4 @@
-﻿name: Build and Release APK
+﻿name: CyberWin Build and Release APK
 
 on:
   push:
