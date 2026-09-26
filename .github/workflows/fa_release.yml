@@ -58,9 +58,13 @@ jobs:
             cmake-${{ runner.os }}-
 
       # ==========【修复：增加base64解码，生成真实keystore文件】==========
+      #- name: Decode signing keystore from base64
+      #  run: |
+      #    echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.keystore
       - name: Decode signing keystore from base64
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.keystore
+          printf "%s" "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.keystore
+          keytool -list -keystore app/release.keystore -storepass ${{ secrets.KEY_STORE_PASSWORD }}
       - name: Setup signing keystore properties
         run: |
           cat > app/keystore.properties <<'EOF'
