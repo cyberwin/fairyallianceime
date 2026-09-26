@@ -30,10 +30,41 @@ class AsrModelManager(private val context: Context) {
             decoderFile = "decoder.onnx",
             joinerFile = "joiner.int8.onnx"
         )
+        
+        //2026-09-26
+        val MULTILANG_ZIPFORMER = AsrModelInfo(
+            id = "zipformer-multi-ar-en-id-ja-ru-th-vi-zh-int8",
+            name = "8国语言 Zipformer int8",
+            description = "Zipformer流式，支持中/英/日/俄/泰/越/印尼/阿拉伯实时识别，int8量化",
+            language = "multi",
+            size = "~210MB",
+            downloadUrl = "https://www.modelscope.cn/models/bikeand/asr/resolve/master/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10.tar.bz2",
+            modelType = "transducer",
+            files = listOf("encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"),
+            encoderFile = "encoder.int8.onnx",
+            decoderFile = "decoder.onnx",
+            joinerFile = "joiner.int8.onnx"
+        )
+        
+          val cybersnow_ZIPFORMER = AsrModelInfo(
+            id = "zipformer-multi-ar-en-id-ja-ru-th-vi-zh-int8",
+            name = "仙盟多中文 Zipformer int8",
+            description = "仙盟多中文 Zipformer流式，支持中/英/日/俄/泰/越/印尼/阿拉伯实时识别，int8量化",
+            language = "multi",
+            size = "~210MB",
+            downloadUrl = "https://www.modelscope.cn/models/bikeand/asr/resolve/master/sherpa-onnx-streaming-zipformer-ctc-zh-xlarge-int8-2025-06-30.tar.bz2",
+            modelType = "transducer",
+            files = listOf("encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"),
+            encoderFile = "encoder.int8.onnx",
+            decoderFile = "decoder.onnx",
+            joinerFile = "joiner.int8.onnx"
+        )
 
         /** 兼容旧引用。 */
+        // val AVAILABLE_MODELS: List<AsrModelInfo> = listOf(DEFAULT_MODEL)
         @Deprecated("使用 getAsrModels()/getSelectedModelInfo() 从索引读取")
-        val AVAILABLE_MODELS: List<AsrModelInfo> = listOf(DEFAULT_MODEL)
+        val AVAILABLE_MODELS: List<AsrModelInfo> = listOf(DEFAULT_MODEL,MULTILANG_ZIPFORMER,cybersnow_ZIPFORMER)
+       
 
         private const val DEFAULT_ID = "zipformer-zh-int8"
 
@@ -45,7 +76,8 @@ class AsrModelManager(private val context: Context) {
                 id = info.id,
                 name = info.name,
                 description = info.description,
-                language = "zh",
+               // language = "zh",
+                language = info.language ?: "zh", // 从远程model读取，取不到才兜底zh 20026-09-26
                 size = version?.size ?: info.size,
                 downloadUrl = info.archiveUrl ?: "",
                 modelType = "transducer",
