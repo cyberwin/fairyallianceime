@@ -28,6 +28,7 @@ data class ModelInfo(
     val name: String,
     val description: String,
     val category: ModelCategory,
+    val language: String = "zh",//2026-09-26 增加语言
     val versions: List<ModelVersion> = emptyList(),
     val size: String = ""
 ) {
