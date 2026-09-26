@@ -77,9 +77,9 @@ object AppInfo {
     
     val dependencies = listOf(
         LicenseItem(
-            name = "曦码",
+            name = "仙盟",
             license = "GPL-3.0",
-            url = "https://github.com/ximeiorg/Xime"
+            url = "https://github.com/cyberwin/fairyallianceime"
         ),
         LicenseItem(
             name = "librime",
@@ -202,14 +202,14 @@ fun AboutContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "曦码（Xime）",
+                            text = "仙盟（fairyallianceime）",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "基于Rime 构建，支持五笔/拼音/自定义方案。",
+                            text = "基于xime，Rime 构建，支持五笔/拼音/自定义方案。",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -229,7 +229,7 @@ fun AboutContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { uriHandler.openUri("https://github.com/ximeiorg/Xime/releases") },
+                                .clickable { uriHandler.openUri("https://github.com/cyberwin/fairyallianceime/releases") },
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -282,12 +282,12 @@ fun AboutContent(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Kor1 (kingzcheung)",
+                                    text = "cyberwin cybersnow",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = "github.com/kingzcheung",
+                                    text = "github.com/cyberwin/",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -309,7 +309,7 @@ fun AboutContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            uriHandler.openUri("https://github.com/ximeiorg/Xime")
+                            uriHandler.openUri("https://github.com/cyberwin/fairyallianceime")
                         },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
@@ -332,7 +332,7 @@ fun AboutContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "github.com/ximeiorg/Xime",
+                                text = "github.com/cyberwin/fairyallianceime",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -555,7 +555,7 @@ fun PrivacyPolicyContent(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "曦码隐私策略",
+                            text = "仙盟隐私策略",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -563,22 +563,22 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "数据收集",
-                            content = "曦码不收集任何个人身份信息。您的输入内容仅用于提供输入法功能，不会被上传到服务器或分享给第三方。"
+                            content = "仙盟不收集任何个人身份信息。您的输入内容仅用于提供输入法功能，不会被上传到服务器或分享给第三方。"
                         )
                         
                         PrivacySection(
                             title = "本地存储",
-                            content = "曦码将用户设置、用户词库和剪贴板历史存储在您的设备本地，不会上传到云端。您可以随时清除这些数据。"
+                            content = "仙盟将用户设置、用户词库和剪贴板历史存储在您的设备本地，不会上传到云端。您可以随时清除这些数据。"
                         )
                         
                         PrivacySection(
                             title = "网络权限",
-                            content = "曦码需要网络权限用于下载联想模型。下载完成后，模型将在本地运行，您的输入内容不会被上传。"
+                            content = "仙盟需要网络权限用于下载联想模型。下载完成后，模型将在本地运行，您的输入内容不会被上传。"
                         )
                         
                         PrivacySection(
                             title = "输入内容",
-                            content = "您的所有输入内容仅保存在本地设备上。曦码使用开源的 Rime 输入引擎，所有处理均在本地完成。"
+                            content = "您的所有输入内容仅保存在本地设备上。仙盟使用开源的 Rime 输入引擎，所有处理均在本地完成。"
                         )
                         
                         PrivacySection(
@@ -588,7 +588,7 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "开源",
-                            content = "曦码是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
+                            content = "仙盟是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
